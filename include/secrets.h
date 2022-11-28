@@ -1,6 +1,7 @@
 #define SECRET_MQTT_USERNAME "AhQYCAYgOjIqAhIINTIDBi0"
 #define SECRET_MQTT_CLIENT_ID "AhQYCAYgOjIqAhIINTIDBi0"
 #define SECRET_MQTT_PASSWORD "wELF2psOXDia8qH6JIbUnX9r"
+#define ThingSpeak_Channel 1947714
 
 #define SECRET_SSID "Mohawk-IoT"
 #define SECRET_PASS "IoT@MohawK1"

@@ -1,3 +1,16 @@
+// COMP-10184 – Mohawk College
+// MQTT
+//
+// This program demonstrates getting x, y, z acceleration data from the MPU6050 sensor and sending it to a ThingSpeak
+// channel every 5 seconds using the MQTT protocol.
+//
+// @author  Joshua Symons-Webb
+// @id      000812836
+//
+// I, Joshua Symons-Webb, 000812836 certify that this material is my original work. No
+// other person's work has been used without due acknowledgement.
+//
+
 #include <Arduino.h>
 #include <Adafruit_MPU6050.h>
 #include <Adafruit_Sensor.h>
@@ -6,42 +19,37 @@
 #include <Wire.h>
 #include "secrets.h"
 
-#define MQTT_MAX_PACKET_SIZE                4096
+#define MQTT_MAX_PACKET_SIZE 4096 // Max packet size for MQTT
+#define DELAY_5 500               // 5 second delay
 
 // Wifi login details
-char ssid[] = SECRET_SSID;                    // Change to your network SSID (name).
-char pass[] = SECRET_PASS;                    // Change to your network password.
+char ssid[] = SECRET_SSID;
+char pass[] = SECRET_PASS;
 
-// interface to ThingSpeak MQTT interface
-const char* mqttServer  = "mqtt3.thingspeak.com";
+// ThingSpeak Channel & MQTT interface configuration
+const char *mqttServer = "mqtt3.thingspeak.com";
 const uint16_t mqttPort = 1883;
-char mqttUserName[] = SECRET_MQTT_USERNAME;      
-char mqttPass[]     = SECRET_MQTT_PASSWORD;     
-char clientID[]     = SECRET_MQTT_CLIENT_ID;    
+char mqttUserName[] = SECRET_MQTT_USERNAME;
+char mqttPass[] = SECRET_MQTT_PASSWORD;
+char clientID[] = SECRET_MQTT_CLIENT_ID;
+int channelID = ThingSpeak_Channel;
 
-// ThingSpeak ChannelID.
-int  channelID      = 1947714;
+String mqttTopic = "channels/" + String(channelID) + "/publish"; // MQTT topic
 
-// this is our MQTT topic 
-String  mqttTopic   = "channels/" + String(channelID) + "/publish";
+WiFiClient client;               // WiFi client
+PubSubClient mqttClient(client); // MQTT publish/subscribe client
 
-// WiFi client
-WiFiClient client;                                 // Initialize the Wi-Fi client library. Uncomment for nonsecure connection.
-
-// MQTT publish/subscribe client
-PubSubClient mqttClient( client );
-
-Adafruit_MPU6050 mpu;
+Adafruit_MPU6050 mpu; // MPU 6050 Configuration
 
 // ***************************************************************************
 // function to setup MPU6050.  configures acceleration range, angular rate change
 // and filter bandwidth.
-// NOTE:  This does not calibrate the sensor, which is required in a real application!
-void configureMPU6050() {
-
+void configureMPU6050()
+{
   mpu.setAccelerometerRange(MPU6050_RANGE_8_G);
   Serial.print("Accelerometer range set to: ");
-  switch (mpu.getAccelerometerRange()) {
+  switch (mpu.getAccelerometerRange())
+  {
   case MPU6050_RANGE_2_G:
     Serial.println("+-2G");
     break;
@@ -57,7 +65,8 @@ void configureMPU6050() {
   }
   mpu.setGyroRange(MPU6050_RANGE_500_DEG);
   Serial.print("Gyro range set to: ");
-  switch (mpu.getGyroRange()) {
+  switch (mpu.getGyroRange())
+  {
   case MPU6050_RANGE_250_DEG:
     Serial.println("+- 250 deg/s");
     break;
@@ -74,7 +83,8 @@ void configureMPU6050() {
 
   mpu.setFilterBandwidth(MPU6050_BAND_5_HZ);
   Serial.print("Filter bandwidth set to: ");
-  switch (mpu.getFilterBandwidth()) {
+  switch (mpu.getFilterBandwidth())
+  {
   case MPU6050_BAND_260_HZ:
     Serial.println("260 Hz");
     break;
@@ -100,62 +110,58 @@ void configureMPU6050() {
 }
 
 // ****************************************************************************
-void updateThingSpeak(void){
+// Gets MPU data and publishes to the ThingSpeak MQTT Client
+void updateThingSpeak(void)
+{
   // Get new sensor events with the readings
   sensors_event_t a, g, temp;
   mpu.getEvent(&a, &g, &temp);
 
-  // /* Print out the values */
-  // Serial.print("Acceleration X: ");
-  // Serial.print(a.acceleration.x);
-  // Serial.print(", Y: ");
-  // Serial.print(a.acceleration.y);
-  // Serial.print(", Z: ");
-  // Serial.print(a.acceleration.z);
-  // Serial.println(" m/s^2");
-
-  // // print rotation rates in degrees/s.  180/PI converts radians/sec to deg/sec
-  // Serial.print("Rotation X: ");
-  // Serial.print(g.gyro.x * 180/PI);
-  // Serial.print(", Y: ");
-  // Serial.print(g.gyro.y * 180/PI);
-  // Serial.print(", Z: ");
-  // Serial.print(g.gyro.z * 180/PI);
-  // Serial.println(" deg/s");
-
   String mqttData;
-  if ( mqttClient.connect(clientID, mqttUserName, mqttPass)) {
+  if (mqttClient.connect(clientID, mqttUserName, mqttPass)) // Makes MQTT Connection
+  {
     Serial.println("Connection made to MQTT broker!");
-    
-    // assemble data for broker in the form "field1=<data>&field2=<data>&field3=<data>..."
-    // just use random numbers for this test...
-    mqttData = "field1="+String(a.acceleration.x)+"&field2="+String(a.acceleration.y)+"&field3="+String(a.acceleration.z);
+
+    mqttData = "field1=" + String(a.acceleration.x) + "&field2=" + String(a.acceleration.y) + "&field3=" + String(a.acceleration.z);
     Serial.println("  Publish data=" + mqttData);
 
     // publish data
-    if ( mqttClient.publish(mqttTopic.c_str(), mqttData.c_str() )) {
+    if (mqttClient.publish(mqttTopic.c_str(), mqttData.c_str()))
+    {
       Serial.println("  Publish was successful!");
-    } else {
+    }
+    else
+    {
       Serial.println("  Publish failed..");
     }
 
     // disconnect from broker.  if we were also a subscriber, we would not do this.
     mqttClient.disconnect();
-  } else {
+  }
+  else
+  {
     // See https://pubsubclient.knolleary.net/api.html#state for the failure code explanation.
     Serial.print("  Failed with state: ");
     Serial.println(mqttClient.state());
   }
 }
 
-void setup() {
-  // start debug console
-  Serial.begin(115200);
+// ****************************************************************************
+void setup()
+{
+  Serial.begin(115200); // configure the USB serial monitor
 
-  // Try to initialize!
-  if (!mpu.begin()) {
+  // Introduction Message
+  Serial.println("--- COMP-10184 - MQTT ---");
+  Serial.println("Name      : Joshua Symons-Webb");
+  Serial.println("Student ID: 000812836 \n\n\n");
+  delay(500); // Delay for intro message
+
+  if (!mpu.begin()) // Try to initialize!
+  {
     Serial.println("Failed to find MPU6050 chip");
-    while (1) {
+    while (1)
+    {
       delay(10);
     }
   }
@@ -163,8 +169,6 @@ void setup() {
 
   // set up accel/gyro sensor
   configureMPU6050();
-
-  Serial.println("\nMQTT Test Program\n");
 
   // connect to WiFi
   Serial.printf("\nConnecting to %s ", ssid);
@@ -180,14 +184,12 @@ void setup() {
   mqttClient.setServer(mqttServer, mqttPort);
 }
 
-void loop() {
-  // try to publish data to ThingSpeak using MQTT protocol
-  updateThingSpeak();
-  
-  // MQTT libraries need this
-  mqttClient.loop();
+// ****************************************************************************
+void loop()
+{
+  updateThingSpeak(); // try to publish data to ThingSpeak using MQTT protocol
 
-  // wait 5 seconds.  we can go faster, but ThingSpeak only accepts data 
-  // every 15 seconds for the free tier.
-  delay(5000);
+  mqttClient.loop(); // MQTT libraries need this
+
+  delay(DELAY_5); // Wait every 5 seconds
 }
